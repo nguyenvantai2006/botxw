@@ -1,6 +1,9 @@
+import os
+import threading
 import telebot
 import mysql.connector
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from flask import Flask
 
 # 1. CẤU HÌNH THÔNG TIN
 TOKEN = '8852529291:AAFkf8zsbrNYupS0euCYjwewpQrOD0dy59o'
@@ -15,7 +18,7 @@ TEXTS = {
         'btn_send': "📤 Gửi Code",
         'empty_codes': "Tạm thời kho code đang trống. Bạn hãy quay lại sau nhé!",
         'here_are_codes': "Code XWorld xịn xò của bạn đây (chạm để copy):\n\n",
-        'ask_code': "Vui lòng nhập code XWorld bạn muốn chia sẻ:",
+        'ask_code': "Vui lòng nhập code XWorld muốn chia sẻ:",
         'thanks': "✅ Cảm ơn bạn! Code đã được ghi nhận và đang chờ Admin duyệt."
     },
     'id': {
@@ -25,28 +28,26 @@ TEXTS = {
         'empty_codes': "Stok kode sedang kosong. Silakan kembali lagi nanti!",
         'here_are_codes': "Ini kode XWorld keren Anda (ketuk untuk menyalin):\n\n",
         'ask_code': "Silakan masukkan kode XWorld yang ingin Anda bagikan:",
-        'thanks': "✅ Terima kasih! Kode telah dicatat dan menunggu persetujuan Admin."
+        'thanks': "✅ Terima kasih! Kode telah dicatat và menunggu persetujuan Admin."
     }
 }
 
 # Biến lưu trữ ngôn ngữ tạm thời của người dùng (Mặc định là 'vi')
 user_langs = {}
 
-# Hàm kết nối Database
 # Hàm kết nối Database (Đã lên Cloud Aiven)
 def get_db():
     return mysql.connector.connect(
-        host="mysql-17c9d10f-vantai20102006-20d3.h.aivencloud.com", # Copy ở dòng Host
-        port=22942,                                                  # Copy ở dòng Port
-        user="avnadmin",                                             # Copy ở dòng User
-        password="AVNS_OpoLnQKnRraW_SOz0MB",                                 # Bấm vào biểu tượng con mắt ở dòng Password để xem và chép vào đây
-        database="defaultdb"                                         # Copy ở dòng Database name
+        host="mysql-17c9d10f-vantai20102006-20d3.h.aivencloud.com",
+        port=22942,
+        user="avnadmin",
+        password="AVNS_OpoLnQKnRraW_SOz0MB",
+        database="defaultdb"
     )
 
 # ----------------- GIAO DIỆN NGƯỜI DÙNG -----------------
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    # Bước 1: Hiển thị bảng chọn ngôn ngữ
     markup = InlineKeyboardMarkup()
     markup.row_width = 2
     markup.add(
@@ -59,13 +60,10 @@ def send_welcome(message):
 def callback_query(call):
     user_id = call.from_user.id
     
-    # XỬ LÝ KHI NGƯỜI DÙNG BẤM CHỌN NGÔN NGỮ
     if call.data.startswith("lang_"):
-        # Lấy ra đuôi 'vi' hoặc 'id' từ callback_data
         lang_code = call.data.split("_")[1] 
-        user_langs[user_id] = lang_code # Lưu vào bộ nhớ
+        user_langs[user_id] = lang_code 
         
-        # Đổi tin nhắn chọn ngôn ngữ thành Menu chính
         markup = InlineKeyboardMarkup()
         markup.row_width = 2
         markup.add(
@@ -75,10 +73,8 @@ def callback_query(call):
         bot.edit_message_text(TEXTS[lang_code]['welcome'], call.message.chat.id, call.message.message_id, reply_markup=markup)
         return
 
-    # Xác định ngôn ngữ của người dùng đang bấm (nếu chưa chọn thì mặc định là tiếng Việt)
     lang = user_langs.get(user_id, 'vi')
 
-    # XỬ LÝ MENU CHÍNH
     if call.data == "get_code":
         db = get_db()
         cursor = db.cursor()
@@ -99,7 +95,7 @@ def callback_query(call):
 def process_code_step(message):
     user_code = message.text.strip()
     user_id = message.from_user.id
-    lang = user_langs.get(user_id, 'vi') # Lấy ngôn ngữ để reply cho chuẩn
+    lang = user_langs.get(user_id, 'vi')
     
     db = get_db()
     cursor = db.cursor()
@@ -108,14 +104,10 @@ def process_code_step(message):
     db.close()
     
     bot.reply_to(message, TEXTS[lang]['thanks'])
-    
-    # Thông báo cho Admin (Vẫn giữ nguyên tiếng Việt cho bạn dễ đọc)
     bot.send_message(ADMIN_ID, f"🔔 Có code mới chờ duyệt!\nNgười gửi (ID): {user_id}\nCode: `{user_code}`", parse_mode='Markdown')
 
 
 # ----------------- TÍNH NĂNG QUẢN TRỊ VIÊN (ADMIN) -----------------
-# (Khu vực này mình không dịch vì chỉ có bạn - Admin dùng)
-
 @bot.message_handler(commands=['pending'])
 def view_pending_codes(message):
     if message.from_user.id != ADMIN_ID:
@@ -143,7 +135,6 @@ def approve_code(message):
     
     try:
         code_id = message.text.split()[1]
-        
         db = get_db()
         cursor = db.cursor()
         cursor.execute("UPDATE gift_codes SET status = 'approved' WHERE id = %s", (code_id,))
@@ -163,7 +154,6 @@ def delete_code(message):
     
     try:
         code_id = message.text.split()[1]
-        
         db = get_db()
         cursor = db.cursor()
         cursor.execute("DELETE FROM gift_codes WHERE id = %s", (code_id,))
@@ -172,36 +162,33 @@ def delete_code(message):
         if cursor.rowcount > 0:
             bot.reply_to(message, f"🗑️ Đã xóa vĩnh viễn code có ID: {code_id} khỏi hệ thống!")
         else:
-            bot.reply_to(message, f"⚠️ Không tìm thấy code nào có ID: {code_id} trong kho.")
+            bot.reply_to(message, f"⚠️ Không tìm thấy code có ID: {code_id} trong kho.")
             
         db.close()
-        
     except IndexError:
-        bot.reply_to(message, "⚠️ Cú pháp sai! Hãy gõ: /delete <ID_của_code> (hoặc /del <ID>)")
+        bot.reply_to(message, "⚠️ Cú pháp sai! Hãy gõ: /delete <ID_của_code>")
     except Exception as e:
         bot.reply_to(message, f"Lỗi: {e}")
 
-# Kích hoạt bot
-print("🚀 Bot đang chạy...")
-# --- ĐOẠN CODE LÁCH LUẬT RENDER (TẠO WEB GIẢ) ---
-from flask import Flask
-import threading
-import os
 
+# ----------------- KHỞI TẠO WEB GIẢ & CHẠY BOT 24/7 -----------------
 app = Flask(__name__)
 
-@app.route('/')
+@app.route("/")
 def home():
     return "🚀 Trạm Code XWorld đang hoạt động 24/7!"
 
 def run_web():
-    # Render sẽ tự cấp Port, mình lấy Port đó để chạy web
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
-# Chạy trang web giả trên một luồng (thread) chạy ngầm
-threading.Thread(target=run_web).start()
+# Chạy web giả ở background thread
+threading.Thread(target=run_web, daemon=True).start()
 
-# Kích hoạt bot Telegram chạy song song
-print("🚀 Bot đang chạy...")
-bot.infinity_polling()
+if __name__ == "__main__":
+    while True:
+        try:
+            print("🚀 Bot đang chạy và sẵn sàng nhận lệnh...")
+            bot.infinity_polling(none_stop=True, interval=0, timeout=20)
+        except Exception as e:
+            print(f"⚠️ Bot bị rớt mạng hoặc lỗi: {e}, đang tự khởi động lại...")
