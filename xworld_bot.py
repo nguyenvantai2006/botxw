@@ -36,14 +36,17 @@ TEXTS = {
 user_langs = {}
 
 # Hàm kết nối Database (Đã lên Cloud Aiven)
+# Hàm kết nối Database có cơ chế an toàn chống mất mạng
 def get_db():
-    return mysql.connector.connect(
+    db = mysql.connector.connect(
         host="mysql-17c9d10f-vantai20102006-20d3.h.aivencloud.com",
         port=22942,
         user="avnadmin",
         password="AVNS_OpoLnQKnRraW_SOz0MB",
-        database="defaultdb"
+        database="defaultdb",
+        autocommit=True  # Tự động lưu lệnh mà không cần gọi commit thủ công rườm rà
     )
+    return db
 
 # ----------------- GIAO DIỆN NGƯỜI DÙNG -----------------
 @bot.message_handler(commands=['start'])
