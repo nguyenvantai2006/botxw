@@ -7,7 +7,7 @@ from flask import Flask
 
 # 1. CẤU HÌNH THÔNG TIN
 TOKEN = '8852529291:AAFkf8zsbrNYupS0euCYjwewpQrOD0dy59o'
-ADMIN_ID = 6765343155  # Điền số ID của bạn vào đây (không có ngoặc kép)
+ADMIN_ID = 6765343155  
 bot = telebot.TeleBot(TOKEN)
 
 # 2. BỘ TỪ ĐIỂN ĐA NGÔN NGỮ (VI & ID)
@@ -28,15 +28,13 @@ TEXTS = {
         'empty_codes': "Stok kode sedang kosong. Silakan kembali lagi nanti!",
         'here_are_codes': "Ini kode XWorld keren Anda (ketuk untuk menyalin):\n\n",
         'ask_code': "Silakan masukkan kode XWorld yang ingin Anda bagikan:",
-        'thanks': "✅ Terima kasih! Kode telah dicatat và menunggu persetujuan Admin."
+        'thanks': "✅ Terima kasih! Kode telah dicatat dan menunggu persetujuan Admin."
     }
 }
 
-# Biến lưu trữ ngôn ngữ tạm thời của người dùng (Mặc định là 'vi')
 user_langs = {}
 
-# Hàm kết nối Database (Đã lên Cloud Aiven)
-# Hàm kết nối Database có cơ chế an toàn chống mất mạng
+# Hàm kết nối Database
 def get_db():
     db = mysql.connector.connect(
         host="mysql-17c9d10f-vantai20102006-20d3.h.aivencloud.com",
@@ -44,7 +42,7 @@ def get_db():
         user="avnadmin",
         password="AVNS_OpoLnQKnRraW_SOz0MB",
         database="defaultdb",
-        autocommit=True  # Tự động lưu lệnh mà không cần gọi commit thủ công rườm rà
+        autocommit=True
     )
     return db
 
@@ -100,17 +98,19 @@ def process_code_step(message):
     user_id = message.from_user.id
     lang = user_langs.get(user_id, 'vi')
     
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("INSERT INTO gift_codes (code, user_id) VALUES (%s, %s)", (user_code, user_id))
-    db.commit()
-    db.close()
-    
-    bot.reply_to(message, TEXTS[lang]['thanks'])
-    bot.send_message(ADMIN_ID, f"🔔 Có code mới chờ duyệt!\nNgười gửi (ID): {user_id}\nCode: `{user_code}`", parse_mode='Markdown')
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("INSERT INTO gift_codes (code, user_id, status) VALUES (%s, %s, 'pending')", (user_code, user_id))
+        db.close()
+        
+        bot.reply_to(message, TEXTS[lang]['thanks'])
+        bot.send_message(ADMIN_ID, f"🔔 Có code mới chờ duyệt!\nNgười gửi (ID): {user_id}\nCode: `{user_code}`", parse_mode='Markdown')
+    except Exception as e:
+        bot.reply_to(message, "⚠️ Code này đã tồn tại trong hệ thống rồi hoặc có lỗi xảy ra!")
 
 
-# ----------------- TÍNH NĂNG QUẢN TRỊ VIÊN (ADMIN) -----------------
+# ----------------- TÍNH NĂNG ADMIN -----------------
 @bot.message_handler(commands=['pending'])
 def view_pending_codes(message):
     if message.from_user.id != ADMIN_ID:
@@ -118,7 +118,6 @@ def view_pending_codes(message):
     
     db = get_db()
     cursor = db.cursor()
-    # Chỉ lấy ra cột code vì cấu trúc mới không dùng id số nữa
     cursor.execute("SELECT code FROM gift_codes WHERE status = 'pending'")
     pending_codes = cursor.fetchall()
     db.close()
@@ -131,6 +130,7 @@ def view_pending_codes(message):
         bot.reply_to(message, text, parse_mode='Markdown')
     else:
         bot.reply_to(message, "Không có code nào đang chờ duyệt!")
+
 @bot.message_handler(commands=['approve'])
 def approve_code(message):
     if message.from_user.id != ADMIN_ID:
@@ -141,7 +141,6 @@ def approve_code(message):
         
         db = get_db()
         cursor = db.cursor()
-        # Sửa thành update theo cột code
         cursor.execute("UPDATE gift_codes SET status = 'approved' WHERE code = %s", (code_name,))
         db.close()
         
@@ -150,6 +149,7 @@ def approve_code(message):
         bot.reply_to(message, "⚠️ Cú pháp sai! Hãy gõ: /approve hihi123")
     except Exception as e:
         bot.reply_to(message, f"Lỗi: {e}")
+
 @bot.message_handler(commands=['delete', 'del'])
 def delete_code(message):
     if message.from_user.id != ADMIN_ID:
@@ -160,7 +160,6 @@ def delete_code(message):
         
         db = get_db()
         cursor = db.cursor()
-        # Sửa thành delete theo cột code
         cursor.execute("DELETE FROM gift_codes WHERE code = %s", (code_name,))
         db.close()
         
@@ -169,6 +168,11 @@ def delete_code(message):
         bot.reply_to(message, "⚠️ Cú pháp sai! Hãy gõ: /delete hihi123 (hoặc /del hihi123)")
     except Exception as e:
         bot.reply_to(message, f"Lỗi: {e}")
+
+
+# ----------------- KHỞI TẠO FLASK (QUAN TRỌNG) -----------------
+app = Flask(__name__)
+
 @app.route("/")
 def home():
     return "🚀 Trạm Code XWorld đang hoạt động 24/7!"
@@ -177,7 +181,6 @@ def run_web():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
-# Chạy web giả ở background thread
 threading.Thread(target=run_web, daemon=True).start()
 
 if __name__ == "__main__":
