@@ -118,65 +118,57 @@ def view_pending_codes(message):
     
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT id, code FROM gift_codes WHERE status = 'pending'")
+    # Chỉ lấy ra cột code vì cấu trúc mới không dùng id số nữa
+    cursor.execute("SELECT code FROM gift_codes WHERE status = 'pending'")
     pending_codes = cursor.fetchall()
     db.close()
     
     if pending_codes:
         text = "📋 DANH SÁCH CODE CHỜ DUYỆT:\n\n"
         for code in pending_codes:
-            text += f"ID {code[0]} | Code: `{code[1]}`\n"
-        text += "\n👉 Dùng lệnh: /approve <ID> để duyệt."
+            text += f"🔹 `{code[0]}`\n"
+        text += "\n👉 Duyệt: /approve <tên_code>\n👉 Xóa: /delete <tên_code>"
         bot.reply_to(message, text, parse_mode='Markdown')
     else:
         bot.reply_to(message, "Không có code nào đang chờ duyệt!")
-
 @bot.message_handler(commands=['approve'])
 def approve_code(message):
     if message.from_user.id != ADMIN_ID:
         return
     
     try:
-        code_id = message.text.split()[1]
+        code_name = message.text.split(maxsplit=1)[1].strip()
+        
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("UPDATE gift_codes SET status = 'approved' WHERE id = %s", (code_id,))
-        db.commit()
+        # Sửa thành update theo cột code
+        cursor.execute("UPDATE gift_codes SET status = 'approved' WHERE code = %s", (code_name,))
         db.close()
         
-        bot.reply_to(message, f"✅ Đã duyệt thành công code có ID: {code_id}.")
+        bot.reply_to(message, f"✅ Đã duyệt thành công code: `{code_name}`.", parse_mode='Markdown')
     except IndexError:
-        bot.reply_to(message, "⚠️ Cú pháp sai! Hãy gõ: /approve <ID_của_code>")
+        bot.reply_to(message, "⚠️ Cú pháp sai! Hãy gõ: /approve hihi123")
     except Exception as e:
         bot.reply_to(message, f"Lỗi: {e}")
-
 @bot.message_handler(commands=['delete', 'del'])
 def delete_code(message):
     if message.from_user.id != ADMIN_ID:
         return
     
     try:
-        code_id = message.text.split()[1]
+        code_name = message.text.split(maxsplit=1)[1].strip()
+        
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("DELETE FROM gift_codes WHERE id = %s", (code_id,))
-        db.commit()
-        
-        if cursor.rowcount > 0:
-            bot.reply_to(message, f"🗑️ Đã xóa vĩnh viễn code có ID: {code_id} khỏi hệ thống!")
-        else:
-            bot.reply_to(message, f"⚠️ Không tìm thấy code có ID: {code_id} trong kho.")
-            
+        # Sửa thành delete theo cột code
+        cursor.execute("DELETE FROM gift_codes WHERE code = %s", (code_name,))
         db.close()
+        
+        bot.reply_to(message, f"🗑️ Đã xóa vĩnh viễn code: `{code_name}` khỏi hệ thống!", parse_mode='Markdown')
     except IndexError:
-        bot.reply_to(message, "⚠️ Cú pháp sai! Hãy gõ: /delete <ID_của_code>")
+        bot.reply_to(message, "⚠️ Cú pháp sai! Hãy gõ: /delete hihi123 (hoặc /del hihi123)")
     except Exception as e:
         bot.reply_to(message, f"Lỗi: {e}")
-
-
-# ----------------- KHỞI TẠO WEB GIẢ & CHẠY BOT 24/7 -----------------
-app = Flask(__name__)
-
 @app.route("/")
 def home():
     return "🚀 Trạm Code XWorld đang hoạt động 24/7!"
