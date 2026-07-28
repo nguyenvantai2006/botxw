@@ -30,7 +30,7 @@ TEXTS = {
         'btn_get': "🎁 Dapatkan Kode XWorld",
         'btn_send': "📤 Kirim Kode",
         'btn_guide': "📖 Cara Masukkan Kode",
-        'guide_info': "1. Buka app XWorld\n2. Pilih 3 garis di sudut kiri layar\n3. Pilih kode hadiah dan masukkan\n4. Pilih tukar kode dan terima hadiah",
+        'guide_info': "1. Buka app XWorld\n2. Pilih 3 garis di sudut kiri layar\n3. Pilih giftcode dan masukkan\n4. Pilih tukar kode dan terima hadiah",
         'btn_sell': "🐾 Jual Pet XWorld",
         'sell_info': "Hubungi @linhthuxworld\nKirimkan skill dan harga pet yang ingin dijual ya",
         'empty_codes': "Stok kode sedang kosong. Silakan kembali lagi nanti!",
@@ -57,8 +57,19 @@ def get_db():
 # ----------------- GIAO DIỆN NGƯỜI DÙNG -----------------
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
+    user_id = message.from_user.id
+    
+    # Lưu user_id vào database (dùng INSERT IGNORE hoặc kiểm tra để tránh trùng lặp)
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("INSERT IGNORE INTO bot_users (user_id) VALUES (%s)", (user_id,))
+        db.close()
+    except Exception as e:
+        print(f"Lỗi lưu user: {e}")
+
     markup = InlineKeyboardMarkup()
-    markup.row_width = 2
+    markup.row_width = 1
     markup.add(
         InlineKeyboardButton("🇻🇳 Tiếng Việt", callback_data="lang_vi"),
         InlineKeyboardButton("🇮🇩 Indonesia", callback_data="lang_id")
@@ -184,6 +195,39 @@ def delete_code(message):
         bot.reply_to(message, "⚠️ Cú pháp sai! Hãy gõ: /delete hihi123 (hoặc /del hihi123)")
     except Exception as e:
         bot.reply_to(message, f"Lỗi: {e}")
+
+# Lệnh Broadcast thông báo hàng loạt cho Admin
+@bot.message_handler(commands=['broadcast'])
+def broadcast_message(message):
+    if message.from_user.id != ADMIN_ID:
+        return bot.reply_to(message, "⛔ Bạn không có quyền dùng lệnh này!")
+    
+    try:
+        # Lấy nội dung thông báo sau lệnh /broadcast
+        broadcast_text = message.text.split(maxsplit=1)[1].strip()
+    except IndexError:
+        return bot.reply_to(message, "⚠️ Cú pháp sai! Hãy gõ: /broadcast <nội dung thông báo>")
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT user_id FROM bot_users")
+    users = cursor.fetchall()
+    db.close()
+
+    success_count = 0
+    fail_count = 0
+
+    bot.reply_to(message, f"⏳ Đang gửi thông báo đến {len(users)} người dùng...")
+
+    for u in users:
+        u_id = u[0]
+        try:
+            bot.send_message(u_id, f"📢 **THÔNG BÁO TỪ ADMIN**:\n\n{broadcast_text}", parse_mode='Markdown')
+            success_count += 1
+        except Exception:
+            fail_count += 1 # Trường hợp người dùng đã chặn bot
+
+    bot.send_message(ADMIN_ID, f"✅ Đã gửi xong!\n- Thành công: {success_count}\n- Thất bại (chặn bot): {fail_count}")
 
 
 # ----------------- KHỞI TẠO FLASK -----------------
