@@ -195,8 +195,8 @@ def delete_code(message):
     except Exception as e:
         bot.reply_to(message, f"Lỗi: {e}")
 
-# Lệnh Broadcast thông báo hàng loạt (Sử dụng bắt chuỗi để không bị lỗi không nhận lệnh)
-@bot.message_handler(func=lambda message: message.text and message.text.startswith('/broadcast'))
+# Lệnh Broadcast thông báo hàng loạt (Sử dụng chuẩn commands)
+@bot.message_handler(commands=['broadcast'])
 def broadcast_message(message):
     if message.from_user.id != ADMIN_ID:
         return bot.reply_to(message, "⛔ Bạn không có quyền dùng lệnh này!")
