@@ -195,8 +195,8 @@ def delete_code(message):
     except Exception as e:
         bot.reply_to(message, f"Lỗi: {e}")
 
-# Lệnh Broadcast thông báo hàng loạt (Sử dụng chuẩn commands)
-@bot.message_handler(commands=['broadcast'])
+# Lệnh Broadcast thông báo hàng loạt (hỗ trợ cả /broadcast và /brocast)
+@bot.message_handler(commands=['broadcast', 'brocast'])
 def broadcast_message(message):
     if message.from_user.id != ADMIN_ID:
         return bot.reply_to(message, "⛔ Bạn không có quyền dùng lệnh này!")
@@ -204,7 +204,7 @@ def broadcast_message(message):
     try:
         broadcast_text = message.text.split(maxsplit=1)[1].strip()
     except IndexError:
-        return bot.reply_to(message, "⚠️ Cú pháp sai! Hãy gõ: /broadcast <nội dung thông báo>")
+        return bot.reply_to(message, "⚠️ Cú pháp sai! Hãy gõ: /broadcast <nội dung thông báo> hoặc /brocast <nội dung thông báo>")
 
     db = get_db()
     cursor = db.cursor()
