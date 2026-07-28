@@ -16,6 +16,8 @@ TEXTS = {
         'welcome': "Chào mừng đến với Trạm Code XWorld!\nBạn muốn làm gì hôm nay?",
         'btn_get': "🎁 Nhận Code XWorld",
         'btn_send': "📤 Gửi Code",
+        'btn_guide': "📖 Hướng dẫn nhập code",
+        'guide_info': "1. Vào app XWorld\n2. Chọn 3 gạch góc trái màn hình\n3. Chọn giftcode và nhập\n4. Chọn đổi thoái mã và nhận thưởng",
         'btn_sell': "🐾 Bán linh thú XWorld",
         'sell_info': "Liên hệ @linhthuxworld\nGửi mình kỹ năng và giá thú muốn bán nhé",
         'empty_codes': "Tạm thời kho code đang trống. Bạn hãy quay lại sau nhé!",
@@ -27,6 +29,8 @@ TEXTS = {
         'welcome': "Selamat datang di Stasiun Kode XWorld!\nApa yang ingin Anda lakukan hari ini?",
         'btn_get': "🎁 Dapatkan Kode XWorld",
         'btn_send': "📤 Kirim Kode",
+        'btn_guide': "📖 Cara Masukkan Kode",
+        'guide_info': "1. Buka app XWorld\n2. Pilih 3 garis di sudut kiri layar\n3. Pilih kode hadiah dan masukkan\n4. Pilih tukar kode dan terima hadiah",
         'btn_sell': "🐾 Jual Pet XWorld",
         'sell_info': "Hubungi @linhthuxworld\nKirimkan skill dan harga pet yang ingin dijual ya",
         'empty_codes': "Stok kode sedang kosong. Silakan kembali lagi nanti!",
@@ -70,10 +74,11 @@ def callback_query(call):
         user_langs[user_id] = lang_code 
         
         markup = InlineKeyboardMarkup()
-        markup.row_width = 2
+        markup.row_width = 1
         markup.add(
             InlineKeyboardButton(TEXTS[lang_code]['btn_get'], callback_data="get_code"),
             InlineKeyboardButton(TEXTS[lang_code]['btn_send'], callback_data="send_code"),
+            InlineKeyboardButton(TEXTS[lang_code]['btn_guide'], callback_data="guide_code"),
             InlineKeyboardButton(TEXTS[lang_code]['btn_sell'], callback_data="sell_pet")
         )
         bot.edit_message_text(TEXTS[lang_code]['welcome'], call.message.chat.id, call.message.message_id, reply_markup=markup)
@@ -97,6 +102,9 @@ def callback_query(call):
     elif call.data == "send_code":
         msg = bot.send_message(call.message.chat.id, TEXTS[lang]['ask_code'])
         bot.register_next_step_handler(msg, process_code_step)
+
+    elif call.data == "guide_code":
+        bot.send_message(call.message.chat.id, TEXTS[lang]['guide_info'])
 
     elif call.data == "sell_pet":
         bot.send_message(call.message.chat.id, TEXTS[lang]['sell_info'])
