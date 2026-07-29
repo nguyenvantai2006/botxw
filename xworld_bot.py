@@ -55,17 +55,38 @@ def get_db():
     return db
 
 # ----------------- GIAO DIỆN NGƯỜI DÙNG -----------------
+# ----------------- GIAO DIỆN NGƯỜI DÙNG -----------------
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     user_id = message.from_user.id
+    username = message.from_user.username
+    first_name = message.from_user.first_name
     
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("INSERT IGNORE INTO bot_users (user_id) VALUES (%s)", (user_id,))
+        
+        # Kiểm tra xem user này đã tồn tại trong database chưa trước khi lưu
+        cursor.execute("SELECT user_id FROM bot_users WHERE user_id = %s", (user_id,))
+        exists = cursor.fetchone()
+        
+        if not exists:
+            # Nếu là người dùng mới hoàn toàn thì mới lưu và báo cho Admin
+            cursor.execute("INSERT INTO bot_users (user_id) VALUES (%s)", (user_id,))
+            
+            # Gửi thông báo về cho Admin
+            username_str = f"(@{username})" if username else ""
+            bot.send_message(
+                ADMIN_ID, 
+                f"🎉 **CÓ NGƯỜI DÙNG MỚI BẤM START!**\n\n"
+                f"👤 Tên: {first_name} {username_str}\n"
+                f"🆔 ID: `{user_id}`", 
+                parse_mode='Markdown'
+            )
+            
         db.close()
     except Exception as e:
-        print(f"Lỗi lưu user: {e}")
+        print(f"Lỗi xử lý user mới: {e}")
 
     markup = InlineKeyboardMarkup()
     markup.row_width = 1
@@ -73,7 +94,7 @@ def send_welcome(message):
         InlineKeyboardButton("🇻🇳 Tiếng Việt", callback_data="lang_vi"),
         InlineKeyboardButton("🇮🇩 Indonesia", callback_data="lang_id")
     )
-    bot.reply_to(message, "Please select your language / Vui lòng chọn ngôn ngữ:", reply_markup=markup)
+    bot.reply_to(message, "Please select your language / Vူi lòng chọn ngôn ngữ:", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
